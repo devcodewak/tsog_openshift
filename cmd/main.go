@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 
 	// _ "net/http/pprof"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/ginuerzh/gost"
 	"github.com/go-log/log"
+
+	golog "log"
 )
 
 var (
@@ -39,7 +42,7 @@ func init() {
 	flag.Parse()
 
 	if printVersion {
-		fmt.Fprintf(os.Stderr, "gost %s d1115.1 (%s)\n", gost.Version, runtime.Version())
+		fmt.Fprintf(os.Stderr, "gost %s d1121 (%s)\n", gost.Version, runtime.Version())
 		os.Exit(0)
 	}
 
@@ -60,6 +63,7 @@ func init() {
 
 	if bNoLog {
 		gost.SetLogger(&gost.NopLogger{})
+		golog.SetOutput(ioutil.Discard)
 	}
 
 }
