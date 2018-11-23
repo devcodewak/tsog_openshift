@@ -42,7 +42,7 @@ func init() {
 	flag.Parse()
 
 	if printVersion {
-		fmt.Fprintf(os.Stderr, "gost %s d1121 (%s)\n", gost.Version, runtime.Version())
+		fmt.Fprintf(os.Stderr, "gost %s d1123 (%s)\n", gost.Version, runtime.Version())
 		os.Exit(0)
 	}
 
@@ -65,7 +65,6 @@ func init() {
 		gost.SetLogger(&gost.NopLogger{})
 		golog.SetOutput(ioutil.Discard)
 	}
-
 }
 
 func main() {
@@ -113,65 +112,23 @@ func (r *route) initChain() (*gost.Chain, error) {
 		ngroup.ID = gid
 		gid++
 
-		// parse the base node
+		// parse the base nodes
 		nodes, err := parseChainNode(ns)
 		if err != nil {
 			return nil, err
 		}
 
 		nid := 1 // node ID
-
 		for i := range nodes {
 			nodes[i].ID = nid
 			nid++
 		}
 		ngroup.AddNode(nodes...)
 
-		// parse peer nodes if exists
-		peerCfg, err := loadPeerConfig(nodes[0].Get("peer"))
-		if err != nil {
-			log.Log(err)
-		}
-		peerCfg.Validate()
-
-		strategy := peerCfg.Strategy
-		// overwrite the strategry in the peer config if `strategy` param exists.
-		if s := nodes[0].Get("strategy"); s != "" {
-			strategy = s
-		}
-		ngroup.Options = append(ngroup.Options,
-			gost.WithFilter(&gost.FailFilter{
-				MaxFails:    peerCfg.MaxFails,
-				FailTimeout: time.Duration(peerCfg.FailTimeout) * time.Second,
-			}),
-			gost.WithStrategy(parseStrategy(strategy)),
-		)
-
-		for _, s := range peerCfg.Nodes {
-			nodes, err = parseChainNode(s)
-			if err != nil {
-				return nil, err
-			}
-
-			for i := range nodes {
-				nodes[i].ID = nid
-				nid++
-			}
-
-			ngroup.AddNode(nodes...)
-		}
-
-		var bypass *gost.Bypass
-		// global bypass
-		if peerCfg.Bypass != nil {
-			bypass = gost.NewBypassPatterns(peerCfg.Bypass.Reverse, peerCfg.Bypass.Patterns...)
-		}
-		nodes = ngroup.Nodes()
-		for i := range nodes {
-			if nodes[i].Bypass == nil {
-				nodes[i].Bypass = bypass // use global bypass if local bypass does not exist.
-			}
-		}
+		go gost.PeriodReload(&peerConfig{
+			group:     ngroup,
+			baseNodes: nodes,
+		}, nodes[0].Get("peer"))
 
 		chain.AddNodeGroup(ngroup)
 	}
@@ -521,6 +478,7 @@ func (r *route) serve() error {
 			gost.HostsHandlerOption(hosts),
 			gost.RetryHandlerOption(node.GetInt("retry")),
 			gost.TimeoutHandlerOption(time.Duration(node.GetInt("timeout"))*time.Second),
+			gost.ProbeResistHandlerOption(node.Get("probe_resist")),
 		)
 
 		srv := &gost.Server{Listener: ln}
