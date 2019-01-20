@@ -42,7 +42,7 @@ func init() {
 	flag.Parse()
 
 	if printVersion {
-		fmt.Fprintf(os.Stderr, "gost %s d1123 (%s)\n", gost.Version, runtime.Version())
+		fmt.Fprintf(os.Stderr, "gost %s d20190120 tls13 (%s)\n", gost.Version, runtime.Version())
 		os.Exit(0)
 	}
 
